@@ -1,0 +1,4 @@
+- name: Openvpn
+  hosts: openvpn
+  roles:
+    - role: '{{playbook_dir}}'

@@ -1,0 +1,3 @@
+---
+# vars file for openvpn
+ovpn_user: 'mikhail'

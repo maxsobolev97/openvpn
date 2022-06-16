@@ -1,0 +1,134 @@
+- name: Install OpenVPN
+  apt:
+    name: openvpn
+    state: latest
+
+- name: Install Easy-RSA
+  apt:
+    name: easy-rsa
+    state: latest
+
+- name: Create RSA dir
+  file:
+    path: ~/easy-rsa
+    state: directory
+  
+- name: Wait folder present
+  wait_for:
+    timeout: 5
+
+- name: Create symbolic link
+  shell:
+    cmd: ln -s /usr/share/easy-rsa/* ~/easy-rsa/
+
+- name: Create VARS file
+  file:
+    path: ~/easy-rsa/vars
+    state: touch
+
+- name: Wait file present
+  wait_for:
+    timeout: 5
+
+- name: Add line to VARS
+  lineinfile:
+    path: ~/easy-rsa/vars
+    line: 'set_var EASYRSA_ALGO "ec"'
+
+- name: Add line to VARS
+  lineinfile:
+    path: ~/easy-rsa/vars
+    line: 'set_var EASYRSA_DIGEST "sha512"'
+
+- name: Init PKI
+  shell:
+    cmd: cd ~/easy-rsa && ./easyrsa init-pki
+
+- name: Build CA
+  become: no
+  shell:
+    cmd: cd ~/easy-rsa && echo server | ./easyrsa build-ca nopass
+
+- name: Gen CA cert
+  shell:
+    cmd: cd ~/easy-rsa && echo server | ./easyrsa gen-req server nopass
+
+- name: Copy private key
+  copy:
+    src: /root/easy-rsa/pki/private/server.key
+    dest: /etc/openvpn/server/
+    remote_src: yes
+
+- name: Sign CA req
+  shell:
+    cmd: cd ~/easy-rsa && echo yes | ./easyrsa sign-req server server
+
+- name: Copy CA cert to ovpn dir
+  copy:
+    src: /root/easy-rsa/pki/ca.crt
+    dest: /etc/openvpn/server/ca.crt
+    remote_src: yes
+
+- name: Copy Server cert to ovpn dir
+  copy:
+    src: /root/easy-rsa/pki/issued/server.crt
+    dest: /etc/openvpn/server/server.crt
+    remote_src: yes
+
+- name: Gen TLS-crypt key
+  shell:
+    cmd: cd ~/easy-rsa && openvpn --genkey --secret ta.key
+
+- name: Copy TLS-crypt key to ovpn
+  copy:
+    src: /root/easy-rsa/ta.key
+    dest: /etc/openvpn/server/ta.key
+    remote_src: yes
+
+- name: Allow ip forwarding
+  lineinfile:
+    path: /etc/sysctl.conf
+    line: net.ipv4.ip_forward = 1
+
+- name: Apply ip forwarding
+  shell:
+    cmd: sysctl -p
+
+- name: Create before rules of UFW
+  lineinfile:
+    path: /etc/ufw/before.rules
+    insertbefore: '# rules.before'
+    line: "{{ item.line }}"
+    state: present
+  with_items:
+    - {line: '# START OPENVPN RULES'}
+    - {line: '# NAT table rules'}
+    - {line: '*nat'}
+    - {line: ':POSTROUTING ACCEPT [0:0]'}
+    - {line: '# Allow traffic from OpenVPN client to eth0'}
+    - {line: '-A POSTROUTING -s 10.8.0.0/8 -o eth0 -j MASQUERADE'}
+    - {line: 'COMMIT'}
+    - {line: '# END OPENVPN RULES'}
+
+- name: Allow default firewall forwarding
+  lineinfile:
+    path: /etc/default/ufw
+    regexp: 'DEFAULT_FORWARD_POLICY="DROP"'
+    line: 'DEFAULT_FORWARD_POLICY="ACCEPT"'
+
+- name: Allow ovpn traffic
+  shell:
+    cmd: '{{ item }}'
+  with_items:
+    - ufw allow {{ ovpn_port }}/{{ ovpn_proto }}
+    - ufw allow OpenSSH
+
+- name: Apply UFW changes
+  shell:
+    cmd: '{{ item }}'
+  with_items:
+    - echo y | ufw disable
+    - echo y | ufw enable
+
+- name: Copy config ovpn
+  include_tasks: config.yml

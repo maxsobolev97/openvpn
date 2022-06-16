@@ -1,0 +1,27 @@
+---
+# tasks file for openvpn
+- name: Update server
+  include_tasks: update_server.yml
+  when: first_install
+  tags:
+    - update
+    - first_install
+
+- name: OVPN install
+  include_tasks: install_ovpn.yml
+  when: not flush_all and first_install
+  tags:
+    - install
+    - first_install
+
+- name: OVPN install
+  include_tasks: config.yml
+  when: update_config and not flush_all
+  tags:
+    - update_configs
+
+- name: Gen client configs
+  include_tasks: users.yml
+  when: first_install or create_user
+  tags:
+    - create_user

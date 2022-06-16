@@ -1,0 +1,17 @@
+- name: Copy config ovpn
+  template:
+    src: server.conf.j2
+    dest: /etc/openvpn/server/server.conf
+
+- name: Enable ovpn daemon
+  when: first_install
+  systemd:
+    name: openvpn-server@server.service
+    state: started
+    enabled: yes
+  
+- name: Restart ovpn daemon
+  when: update_config
+  systemd:
+    name: openvpn-server@server.service
+    state: restarted

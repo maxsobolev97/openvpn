@@ -1,0 +1,6 @@
+openvpn:
+  hosts:
+    amsterdam:
+      ansible_host: 194.87.186.164
+      ansible_user: root
+      ansible_password: 

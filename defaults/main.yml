@@ -1,0 +1,11 @@
+---
+# defaults file for openvpn
+first_install: false
+flush_all: false
+update_config: false
+create_user: true
+
+ovpn_port: '1194'
+ovpn_proto: 'udp'
+ovpn_user: 'client'
+ovpn_user_file_local: '/Users/apple/Desktop'

@@ -1,0 +1,9 @@
+- name: Update repo
+  become: yes
+  shell:
+    cmd: apt update -y
+
+- name: Update server
+  become: yes
+  apt:
+    upgrade: true

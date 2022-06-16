@@ -1,0 +1,54 @@
+- name: Create dirs
+  when: first_install
+  shell:
+    cmd: "{{ item }}"
+  with_items:
+    - mkdir -p /root/client-configs/files
+    - mkdir -p /root/client-configs/keys
+
+- name: Copy user config
+  when: first_install or update_config
+  template:
+    src: client.conf.j2
+    dest: /root/client-configs/base.conf
+
+- name: Copy user create script
+  when: first_install
+  copy:
+    src: make_config.sh
+    dest: /root/client-configs/make_config.sh
+    mode: '0777'
+
+- name: Create user req
+  when: create_user
+  shell:
+    cmd: cd ~/easy-rsa && echo {{ ovpn_user }} | ./easyrsa gen-req {{ ovpn_user }} nopass
+
+- name: Sign user req
+  when: create_user
+  shell:
+    cmd: cd ~/easy-rsa && echo yes | ./easyrsa sign-req client {{ ovpn_user }}
+
+- name: Copy user keys to create ovpn file
+  when: create_user
+  copy:
+    src: "{{ item }}"
+    dest: /root/client-configs/keys/
+    mode: '0777'
+    remote_src: yes
+  with_items:
+    - /root/easy-rsa/pki/private/{{ ovpn_user }}.key
+    - /root/easy-rsa/pki/issued/{{ ovpn_user}}.crt
+    - /root/easy-rsa/ta.key
+    - /etc/openvpn/server/ca.crt
+
+- name: Create user ovpn file
+  when: create_user
+  shell:
+    cmd: cd ~/client-configs && ./make_config.sh "{{ ovpn_user }}"
+
+- name: Fetch user ovpn file
+  when: create_user
+  fetch:
+    src: '/root/client-configs/files/{{ ovpn_user }}.ovpn'
+    dest: '{{ ovpn_user_file_local }}/{{ ovpn_user }}.ovpn'
